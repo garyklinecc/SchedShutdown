@@ -13,15 +13,13 @@ When paired with a server-side 'keep-alive' script that will restart the Rust se
 
 <b>Usage</b> (server console command)
 
-schedule.shutdown <hh:mm:ss> - Resets the shutdown timer, and updates the configuration file. The time is expected to be a UTC time. For example:
+<code>schedule.shutdown hh:mm:ss</code> - Updates the configuration file, and enables a shutdown timer with the new time. The time is expected to be a UTC time. For example: <code>schedule.shutdown 17:30:00</code> will schedule the shutdown for 5:30pm UTC time. 
 
-<code>schedule.shutdown 17:30:00</code>
+<code>schedule.shutdown enable</code> - Enables the shutdown timer for the already configured shutdown time. If the shutdown time has not been configured yet, the timer will remain disabled. 
 
-will schedule the shutdown for 5:30pm UTC time. If the shutdown time is left blank, like so:
+<code>schedule.shutdown disable</code> - Disables the shutdown timer, without changing the shutdown time setting.  Use <code>shedule.shutdown enable</code> to start the shutdown timer again. 
 
-<code>schedule.shutdown   </code>
-
-then any existing shutdown time will be erased, and no shutdown will be scheduled. 
+<code>schedule.shutdown   </code> - Use the command without any parameters to check the timer status (enabled/disabled) and see what shutdown time is currently configured. 
 
 <b>Installation Instructions</b>
 <ol>
@@ -33,15 +31,18 @@ then any existing shutdown time will be erased, and no shutdown will be schedule
 
 <code>
 {
+  "status": "enabled", 
   "UTC_Time": "09:30:00"
 }
 </code>
 
-In the default config file, the UTC_Time is left blank so the server will not shut down automatically until the admin sets an actual shutdown time.
+In the default config file, the status is "disabled" and the UTC_Time is left blank so the server will not shut down automatically until the admin sets an actual shutdown time.
 
 <b>Notes:</b>
 
-If the time is not in the form hh:mm:ss, the plugin will do its best to interpret the time.  If there are any letters  or symbols (besides ':'), the time will be considered a blank time, and disable the automatic shutdown.
+If the time is not in the form hh:mm:ss, the plugin will do its best to interpret the time.  If there are any letters  or symbols (besides ':'), the time will be considered unreadable and it will not be accepted. 
+
+If an unreadable time is entered with the schedule.shutdown command, the command will not make any changes.  If an unreadable time is entered into the config file directly, the config file will be changed to "disabled" status with a blank time value. 
 
 
 
