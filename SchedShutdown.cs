@@ -35,7 +35,7 @@ using Oxide.Core.Libraries;
 
 namespace Oxide.Plugins
 {
-    [Info("SchedShutdown", "db_arcane", "1.1.0")]
+    [Info("SchedShutdown", "db_arcane", "1.1.1")]
     public class SchedShutdown : RustPlugin
     {   
         static List<Oxide.Core.Libraries.Timer.TimerInstance> Timers = new List<Oxide.Core.Libraries.Timer.TimerInstance>();
@@ -65,7 +65,7 @@ namespace Oxide.Plugins
             if (param == "enable")
             {
                 if (Config["UTC_Time"].ToString() == "") {
-                    This.Puts("The shutdown time has not been configured yet. The shutdown timer remains disabled.");
+                    this.Puts("The shutdown time has not been configured yet. The shutdown timer remains disabled.");
                     return;
                 }
                 
@@ -195,6 +195,10 @@ namespace Oxide.Plugins
                 {
                     return ErrorStr;
                 }
+                catch (OverflowException e)
+                {
+                    return ErrorStr;
+                }
                 if ((hr < 0) || (hr > 23)) 
                 {
                     return ErrorStr; 
@@ -211,6 +215,10 @@ namespace Oxide.Plugins
                 {
                     return ErrorStr;
                 }
+                catch (OverflowException e)
+                {
+                    return ErrorStr;
+                }
                 min = ((min < 0) || (min > 59)) ? (Int16)0 : min;
             }
 
@@ -221,6 +229,10 @@ namespace Oxide.Plugins
                     sec = Convert.ToInt16(timeSet[2]);
                 }
                 catch (FormatException e)
+                {
+                    return ErrorStr;
+                }
+                catch (OverflowException e)
                 {
                     return ErrorStr;
                 }
