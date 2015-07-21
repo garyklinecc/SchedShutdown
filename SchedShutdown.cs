@@ -35,20 +35,20 @@ using Oxide.Core.Libraries;
 
 namespace Oxide.Plugins
 {
-    [Info("SchedShutdown", "db_arcane", "1.1.1")]
+    [Info("SchedShutdown", "db_arcane", "1.1.2")]
     public class SchedShutdown : RustPlugin
     {   
         static List<Oxide.Core.Libraries.Timer.TimerInstance> Timers = new List<Oxide.Core.Libraries.Timer.TimerInstance>();
-        DateTime MainTime = new DateTime();
         Oxide.Core.Libraries.Timer MainTimer;
-        string ErrorStr = "error";
+        string TimeFormat = "HH:mm:ss";
+        string EnabledStr = "enabled";
+        string DisabledStr = "disabled";
 
         void Init()
         {
             LoadConfig();
             CleanupConfig();
             MainTimer = Interface.GetMod().GetLibrary<Oxide.Core.Libraries.Timer>("Timer");
-            MainTime = DateTime.UtcNow;
         }
 
         [ConsoleCommand("schedule.shutdown")]
@@ -69,52 +69,60 @@ namespace Oxide.Plugins
                     return;
                 }
                 
-                Config["Status"] = "enabled";
+                Config["Status"] = EnabledStr;
+                SaveConfig();
                 ResetShutdownTimer();
                 return;
             }
             
-            if (param == "disable")
+            if (param == DisabledStr)
             {
-                Config["Status"] = "disabled";
+                Config["Status"] = DisabledStr;
+                SaveConfig();
                 ResetShutdownTimer();
                 return;
             }
             
-            string scheduleTime = ParseTimeSetting(param);
-			if (scheduleTime == ErrorStr) 
-			{
-				this.Puts("The time entered was unreadable. No changes have been made. ");
+            if (!IsTimeValid(param))
+            {
+				this.Puts("The time entered was unreadable, must be in format like '01:30:00'. No changes have been made. ");
                 PrintShutdownStatus();
                 return;
-			}
-            Config["Status"] = "enabled";
-            Config["UTC_Time"] = scheduleTime;
+            }
+            Config["Status"] = EnabledStr;
+            Config["UTC_Time"] = param;
+            SaveConfig();
             ResetShutdownTimer();
         }
-        
         
         [HookMethod("OnServerInitialized")]
         void myOnServerInitialized()
         {
-            if (Config["Status"].ToString() == "disabled") {
+            DateTime configTime; 
+            DateTime mainTime = DateTime.UtcNow;
+            
+            if (Config["Status"].ToString() == DisabledStr) {
                 PrintShutdownStatus();
 				return;
 			}
                 
             // Set up timer for server save and shutdown
-            string shutdownSetting = Config["UTC_Time"].ToString();
-            string[] shutdownHour = shutdownSetting.Split(':');
-            Int32 hours = Convert.ToInt32(shutdownHour[0]);
-            Int32 mins = Convert.ToInt32(shutdownHour[1]);
-            Int32 secs = Convert.ToInt32(shutdownHour[2]);
+            try
+            {
+                configTime = DateTime.ParseExact(Config["UTC_Time"].ToString(), TimeFormat, null);                 
+            }
+            catch (Exception e)
+            {
+                PrintShutdownStatus();
+                return;
+            }
             
-            DateTime shutdownTime = new DateTime(DateTime.UtcNow.Year, DateTime.UtcNow.Month, DateTime.UtcNow.Day, hours, mins, secs, DateTimeKind.Utc);
-            if (MainTime > shutdownTime) 
+            DateTime shutdownTime = new DateTime(mainTime.Year, mainTime.Month, mainTime.Day, configTime.Hour, configTime.Minute, configTime.Second, DateTimeKind.Utc);
+            if (mainTime > shutdownTime) 
             {
                 shutdownTime = shutdownTime.AddDays(1);
             }
-            long shutdownInterval = Convert.ToInt64((shutdownTime - MainTime).TotalSeconds);
+            long shutdownInterval = Convert.ToInt64((shutdownTime - mainTime).TotalSeconds);
 
             // schedule the server save command.
             Oxide.Core.Libraries.Timer.TimerInstance newTimer = MainTimer.Once(shutdownInterval, () => ConsoleSystem.Run.Server.Normal("server.save"));
@@ -142,21 +150,20 @@ namespace Oxide.Plugins
         [HookMethod("LoadDefaultConfig")]
         void myLoadDefaultConfig()
         {
-            Config["Status"] = "disabled";
+            Config["Status"] = DisabledStr;
             Config["UTC_Time"] = "";
             SaveConfig();
         }
 
         private void ResetShutdownTimer()
         {
-            SaveConfig();
             myUnload();
             myOnServerInitialized();
         }
         
         private void PrintShutdownStatus()
         {
-            string status = (Config["Status"].ToString() == "disabled") ? "DISABLED" : "ENABLED";
+            string status = (Config["Status"].ToString() == DisabledStr) ? "DISABLED" : "ENABLED";
             string schedTime = Config["UTC_Time"].ToString();
             schedTime = (schedTime == "") ? "blank" : schedTime + " UTC" ;
 
@@ -166,80 +173,29 @@ namespace Oxide.Plugins
         private void CleanupConfig()
         {
             string status = Config["Status"].ToString().ToLower();
-            Config["Status"] = ((status != "enabled") && (status != "disabled")) ? "disabled" : status;
+            Config["Status"] = ((status != EnabledStr) && (status != DisabledStr)) ? DisabledStr : status;
             
-            string schedTime = ParseTimeSetting(Config["UTC_Time"].ToString()); 
-            Config["UTC_Time"] = (schedTime == ErrorStr) ? "" : schedTime;
+            if (!IsTimeValid(Config["UTC_Time"].ToString())) 
+            {
+               Config["UTC_Time"] = "";
+               Config["Status"] = DisabledStr;
+            }
             SaveConfig();
         }
         
-        private string ParseTimeSetting(string str)
+        private bool IsTimeValid(string timeString)
         {
-            Int16 hr = 0;
-            Int16 min = 0;
-            Int16 sec = 0;
+            DateTime temp;
 
-            if (str == "") {
-                return ErrorStr;
-            }
-
-            string[] timeSet = str.Split(':');
-
-            if (timeSet.Length > 0)
+            try
             {
-                try
-                {
-                    hr = Convert.ToInt16(timeSet[0]);
-                }
-                catch (FormatException e)
-                {
-                    return ErrorStr;
-                }
-                catch (OverflowException e)
-                {
-                    return ErrorStr;
-                }
-                if ((hr < 0) || (hr > 23)) 
-                {
-                    return ErrorStr; 
-                }
+                temp = DateTime.ParseExact(timeString, TimeFormat, null);
             }
-
-            if (timeSet.Length > 1)
+            catch (Exception e)
             {
-                try
-                {
-                    min = Convert.ToInt16(timeSet[1]);
-                }
-                catch (FormatException e)
-                {
-                    return ErrorStr;
-                }
-                catch (OverflowException e)
-                {
-                    return ErrorStr;
-                }
-                min = ((min < 0) || (min > 59)) ? (Int16)0 : min;
+                return false;
             }
-
-            if (timeSet.Length > 2)
-            {
-                try
-                {
-                    sec = Convert.ToInt16(timeSet[2]);
-                }
-                catch (FormatException e)
-                {
-                    return ErrorStr;
-                }
-                catch (OverflowException e)
-                {
-                    return ErrorStr;
-                }
-                sec = ((sec < 0) || (sec > 59)) ? (Int16)0 : sec;
-            }
-
-            return (String.Format("{0:00}:{1:00}:{2:00}", hr, min, sec));
+            return true;
         }
         
     }
